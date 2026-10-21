@@ -1,0 +1,345 @@
+<div class="page">
+  <app-form-head group="Reimbursements" title="Medical Reimbursement" crumb="Medical"
+                 description="Start by choosing the treatment type. You can then add expenses for yourself, your spouse, children and parents and submit them together."
+                 (policy)="viewPolicy()" />
+  <div class="form-layout">
+    <div class="card">
+      <div class="req-note"><span class="star">*</span> Required field. You can’t submit until all required fields are filled.</div>
+
+      <app-form-section [n]="1" title="Treatment type" description="Choose what this claim is for. The rest of the form adapts to your choice." [required]="true">
+        <div class="types" role="radiogroup" aria-label="Treatment type">
+          <button type="button" class="type" [class.on]="treatment() === 'OPD'" (click)="chooseTreatment('OPD')" role="radio" [attr.aria-checked]="treatment() === 'OPD'">
+            <span class="ic"><mat-icon fontSet="material-icons-outlined">favorite_border</mat-icon></span>
+            <strong>Outpatient (OPD)</strong>
+            <small>Doctor visits, medicines, diagnostic tests, dental and eye care. Add expenses for any family member in one claim.</small>
+            <span class="radio"></span>
+          </button>
+          <button type="button" class="type" [class.on]="treatment() === 'IPD'" (click)="chooseTreatment('IPD')" role="radio" [attr.aria-checked]="treatment() === 'IPD'">
+            <span class="ic"><mat-icon fontSet="material-icons-outlined">local_hospital</mat-icon></span>
+            <strong>Inpatient (IPD)</strong>
+            <small>Hospital admission, surgery, room charges and day-care procedures. One claim per admission.</small>
+            <span class="radio"></span>
+          </button>
+        </div>
+      </app-form-section>
+
+      @switch (treatment()) {
+        @case (null) {
+          <app-form-section [n]="2" title="Claim details" [locked]="true" />
+          <app-form-section [n]="3" title="Expenses" [locked]="true" />
+          <app-form-section [n]="4" title="Review & submit" [locked]="true" />
+          <app-form-footer [disabled]="true" disabledReason="Choose a treatment type to continue." note="Choose a treatment type to continue." [showDraft]="false" submitLabel="Continue" (cancel)="cancel()" />
+        }
+
+        <!-- ======================= OPD ======================= -->
+        @case ('OPD') {
+          <form [formGroup]="opdForm">
+            <app-form-section [n]="2" title="Employee & claim details" description="Your details are pulled from HR records. Choose the company and billing month for this claim." [required]="true">
+              <div class="grid-3">
+                <app-locked-field label="Name" [value]="me.name" />
+                <app-locked-field label="Employee code" [value]="me.code" />
+                <app-locked-field label="Date" [value]="today | date: 'dd MMM y'" />
+                <app-locked-field label="Department" [value]="me.department" />
+                <app-locked-field label="Designation" [value]="me.designation" />
+                <div class="field">
+                  <label>Extension no. <span class="star">*</span></label>
+                  <mat-form-field><input matInput formControlName="extension" placeholder="e.g. 2481" inputmode="numeric" /><mat-error>Enter your 3–5 digit extension</mat-error></mat-form-field>
+                </div>
+              </div>
+              <div class="grid-2">
+                <div>
+                  <span class="radio-label">Company <span class="star">*</span></span>
+                  <mat-radio-group formControlName="company" class="choice-list">
+                    @for (c of ['NetSol Technologies Ltd.', 'NetSol Innovation Private Ltd.']; track c) {
+                      <div class="choice" [class.selected]="opdForm.value.company === c"><mat-radio-button [value]="c" color="primary">{{ c }}</mat-radio-button></div>
+                    }
+                  </mat-radio-group>
+                </div>
+                <div class="field">
+                  <label>Billing month <span class="star">*</span></label>
+                  <mat-form-field><mat-select formControlName="billingMonth">@for (m of months; track m) { <mat-option [value]="m">{{ m }}</mat-option> }</mat-select></mat-form-field>
+                </div>
+              </div>
+            </app-form-section>
+
+            <app-form-section [n]="3" title="Expenses" description="Add each expense with the patient’s name and relationship. Detail is doctor’s fee, diagnostic tests or medicines." [required]="true">
+              <table class="data-table opd" [class.invalid-block]="attempted() && opdForm.controls.expenses.invalid">
+                <thead><tr><th>Family member / expense</th><th style="width:110px">Date</th><th style="width:110px">Receipt</th><th class="right" style="width:120px">Amount (PKR)</th><th class="actions-cell"></th></tr></thead>
+                <tbody>
+                  @for (g of expenseGroups(); track g.member.name) {
+                    <tr class="member">
+                      <td><span class="av">{{ g.member.initials }}</span><strong>{{ g.member.name }}</strong><span class="tag">{{ g.member.relation }}</span></td>
+                      <td class="muted">{{ g.items.length }} expense{{ g.items.length > 1 ? 's' : '' }}</td><td></td>
+                      <td class="right num"><strong>{{ g.total | pkr }}</strong></td><td></td>
+                    </tr>
+                    @for (x of g.items; track x.index) {
+                      <tr [class.highlight]="flash() === x.index">
+                        <td class="indent"><div>{{ x.e['detail'] }}</div><div class="sub">{{ x.e['provider'] }}</div></td>
+                        <td>{{ x.e['date'] | date: 'dd MMM y' }}</td>
+                        <td><span class="rc"><mat-icon fontSet="material-icons-outlined">receipt</mat-icon>{{ x.e['receipt'] }}</span></td>
+                        <td class="right num">{{ x.e['amount'] | pkr }}</td>
+                        <td class="actions-cell">
+                          <button mat-icon-button class="icon-btn-sm" type="button" (click)="editExpense(x.index)" matTooltip="Edit" aria-label="Edit expense"><mat-icon fontSet="material-icons-outlined">edit</mat-icon></button>
+                          <button mat-icon-button class="icon-btn-sm" type="button" (click)="removeExpense(x.index)" matTooltip="Delete" aria-label="Delete expense"><mat-icon fontSet="material-icons-outlined">delete</mat-icon></button>
+                        </td>
+                      </tr>
+                    }
+                  } @empty {
+                    <tr><td colspan="5" class="empty">No expenses yet. Add one for any covered family member.</td></tr>
+                  }
+                </tbody>
+                <tfoot><tr>
+                  <td colspan="3"><button class="add-link" type="button" (click)="addExpense()"><span class="material-icons">add</span> Add another expense</button></td>
+                  <td class="right num">{{ opdTotal() | pkr }}</td><td></td>
+                </tr></tfoot>
+              </table>
+              @if (attempted() && opdForm.controls.expenses.invalid) { <small class="text-danger">Add at least one expense.</small> }
+              @if (opdTotal() > opdLeft) { <div class="warn">This claim is above your remaining OPD pool ({{ opdLeft | pkr: true }}). Accounts will pay up to the limit.</div> }
+            </app-form-section>
+
+            <app-form-section [n]="4" title="Review & submit" description="Everything above goes to your approvers as one claim." [required]="true">
+              @if (expenseGroups().length) {
+                <table class="data-table review">
+                  <thead><tr><th>Family member</th><th class="right">Expenses</th><th class="right">Amount (PKR)</th></tr></thead>
+                  <tbody>
+                    @for (g of expenseGroups(); track g.member.name) {
+                      <tr><td>{{ g.member.name }} ({{ g.member.relation }})</td><td class="right">{{ g.items.length }}</td><td class="right num">{{ g.total | pkr }}</td></tr>
+                    }
+                  </tbody>
+                  <tfoot><tr><td>Total OPD claim · {{ expenseGroups().length }} family member{{ expenseGroups().length > 1 ? 's' : '' }} · {{ opdForm.value.expenses?.length }} expenses</td><td></td><td class="right num">{{ opdTotal() | pkr: true }}</td></tr></tfoot>
+                </table>
+              }
+              <div class="field mt">
+                <label>Remarks</label>
+                <mat-form-field><textarea matInput rows="2" formControlName="remarks" placeholder="Anything Accounts should know (optional)"></textarea></mat-form-field>
+              </div>
+              <div class="rules">
+                <strong>No claim will be processed if</strong>
+                <ol type="a">
+                  <li>Supporting documents are not attached.</li>
+                  <li>The form is incomplete.</li>
+                  <li>The claim is time barred, i.e. not submitted within thirty (30) days after the expense is incurred.</li>
+                  <li>It violates any applicable policy or procedure.</li>
+                </ol>
+                <ul><li>Expenses incurred during probation are time barred if not claimed within thirty days after confirmation.</li></ul>
+              </div>
+              <mat-checkbox formControlName="confirm" color="primary">I confirm these expenses were incurred by me or my covered dependents, and the receipts are original. This is my signature on the claim.</mat-checkbox>
+              @if (attempted() && opdForm.controls.confirm.invalid) { <div><small class="text-danger">Tick the box to submit</small></div> }
+            </app-form-section>
+            <app-form-footer [busy]="submitting()" submitLabel="Submit claim" (cancel)="cancel()" (draft)="saveDraft()" (submit)="submit()" />
+          </form>
+        }
+
+        <!-- ======================= IPD ======================= -->
+        @case ('IPD') {
+          <form [formGroup]="ipdForm">
+            <app-form-section [n]="2" title="Policy & employee details" description="As on your EFU group health policy. Pulled from HR records." [required]="true">
+              <div class="grid-3" formGroupName="policy">
+                <app-locked-field label="Policy number" [value]="policyNo" />
+                <app-locked-field label="Employee name" [value]="me.name" />
+                <app-locked-field label="Employee code" [value]="me.code" />
+                <div class="field">
+                  <label>CNIC <span class="star">*</span></label>
+                  <mat-form-field><input matInput formControlName="cnic" placeholder="35202-1234567-1" /><mat-error>Use the format 35202-1234567-1</mat-error></mat-form-field>
+                </div>
+                <div class="field">
+                  <label>Mobile <span class="star">*</span></label>
+                  <mat-form-field><input matInput formControlName="mobile" placeholder="0300-1234567" /><mat-error>Use the format 0300-1234567</mat-error></mat-form-field>
+                </div>
+                <app-locked-field label="Email" [value]="me.email" />
+              </div>
+            </app-form-section>
+
+            <app-form-section [n]="3" title="Patient details" description="Choose the family member who was hospitalised." [required]="true">
+              <div class="grid-2" formGroupName="patient">
+                <div class="field">
+                  <label>Patient <span class="star">*</span></label>
+                  <mat-form-field>
+                    <mat-select formControlName="name" placeholder="Select family member">
+                      @for (f of family; track f.name) { <mat-option [value]="f.name">{{ f.name }} · {{ f.relation }}</mat-option> }
+                    </mat-select>
+                    <mat-error>Choose the patient</mat-error>
+                  </mat-form-field>
+                </div>
+                <app-locked-field label="Relationship" [value]="patient()?.relation ?? '—'" />
+                <app-locked-field label="Age" [value]="ageText(patient())" />
+                <app-locked-field label="Gender" [value]="patient()?.gender ?? '—'" />
+              </div>
+            </app-form-section>
+
+            <app-form-section [n]="4" title="Hospitalization" description="Tell us about the admission." [required]="true">
+              <div formGroupName="hosp">
+                <div class="grid-2">
+                  <div>
+                    <span class="radio-label">Emergency treatment or elective? <span class="star">*</span></span>
+                    <mat-radio-group formControlName="emergency" class="choice-row tight">
+                      @for (o of ['Emergency', 'Elective']; track o) { <div class="choice" [class.selected]="ipdForm.value.hosp?.emergency === o"><mat-radio-button [value]="o" color="primary">{{ o }}</mat-radio-button></div> }
+                    </mat-radio-group>
+                  </div>
+                  <div>
+                    <span class="radio-label">Was pre-authorization taken? <span class="star">*</span></span>
+                    <mat-radio-group formControlName="preAuth" class="choice-row tight">
+                      @for (o of ['Yes', 'No']; track o) { <div class="choice" [class.selected]="ipdForm.value.hosp?.preAuth === o"><mat-radio-button [value]="o" color="primary">{{ o }}</mat-radio-button></div> }
+                    </mat-radio-group>
+                  </div>
+                  @if (ipdForm.value.hosp?.preAuth === 'Yes') {
+                    <div class="field span-2">
+                      <label>Pre-authorization reference <span class="star">*</span></label>
+                      <mat-form-field><input matInput formControlName="preAuthRef" placeholder="e.g. EFU-PA-88213" /><mat-error>Enter the reference</mat-error></mat-form-field>
+                    </div>
+                  }
+                  <div class="field span-2">
+                    <label>Hospital name & city <span class="star">*</span></label>
+                    <mat-form-field><input matInput formControlName="hospital" placeholder="e.g. Doctors Hospital, Lahore" /><mat-error>Enter the hospital</mat-error></mat-form-field>
+                  </div>
+                  <div class="field">
+                    <label>Date of admission <span class="star">*</span></label>
+                    <mat-form-field><input matInput [matDatepicker]="adm" formControlName="admission" [max]="today" /><mat-datepicker-toggle matIconSuffix [for]="adm" /><mat-datepicker #adm /><mat-error>Choose the date</mat-error></mat-form-field>
+                  </div>
+                  <div class="field">
+                    <label>Date of discharge <span class="star">*</span></label>
+                    <mat-form-field><input matInput [matDatepicker]="dis" formControlName="discharge" [max]="today" /><mat-datepicker-toggle matIconSuffix [for]="dis" /><mat-datepicker #dis /><mat-error>Choose the date</mat-error></mat-form-field>
+                    @if (ipdForm.controls.hosp.hasError('dischargeBeforeAdmission')) { <small class="text-danger">Discharge can’t be before admission.</small> }
+                  </div>
+                  <div class="span-2">
+                    <span class="radio-label">Is the patient entitled to any other benefit or compensation from any other source? <span class="star">*</span></span>
+                    <mat-radio-group formControlName="otherBenefit" class="choice-row tight">
+                      @for (o of ['No', 'Yes']; track o) { <div class="choice" [class.selected]="ipdForm.value.hosp?.otherBenefit === o"><mat-radio-button [value]="o" color="primary">{{ o }}</mat-radio-button></div> }
+                    </mat-radio-group>
+                  </div>
+                  @if (ipdForm.value.hosp?.otherBenefit === 'Yes') {
+                    <div class="field span-2">
+                      <label>Give details <span class="star">*</span></label>
+                      <mat-form-field><input matInput formControlName="otherBenefitDetail" placeholder="Insurer or source, and amount" /><mat-error>Add the details</mat-error></mat-form-field>
+                    </div>
+                  }
+                </div>
+              </div>
+
+              @if (!showNewborn()) {
+                <button type="button" class="newborn-add" (click)="toggleNewborn(true)">
+                  <mat-icon>add</mat-icon><div><strong>Add newborn details</strong><small>Delivery / C-section claims only</small></div>
+                </button>
+              } @else {
+                <div class="newborn" formGroupName="newborn">
+                  <div class="nb-head">
+                    <div><strong>Newborn details</strong><small>For delivery or C-section claims. The newborn is covered under the mother’s admission.</small></div>
+                    <button mat-button type="button" class="text-danger" (click)="toggleNewborn(false)"><mat-icon>close</mat-icon>Remove</button>
+                  </div>
+                  <div class="grid-2">
+                    <div>
+                      <span class="radio-label">Mode of delivery <span class="star">*</span></span>
+                      <mat-radio-group formControlName="deliveryMode" class="choice-row tight">
+                        @for (o of ['Normal', 'C-section']; track o) { <div class="choice" [class.selected]="ipdForm.getRawValue().newborn.deliveryMode === o"><mat-radio-button [value]="o" color="primary">{{ o }}</mat-radio-button></div> }
+                      </mat-radio-group>
+                    </div>
+                    <div class="field">
+                      <label>Date of delivery <span class="star">*</span></label>
+                      <mat-form-field><input matInput [matDatepicker]="dd" formControlName="deliveryDate" [max]="today" /><mat-datepicker-toggle matIconSuffix [for]="dd" /><mat-datepicker #dd /></mat-form-field>
+                    </div>
+                    <div class="field">
+                      <label>Name of newborn <span class="star">*</span></label>
+                      <mat-form-field><input matInput formControlName="babyName" placeholder="Or “Baby of Fatima” if not named yet" /></mat-form-field>
+                    </div>
+                    <div>
+                      <span class="radio-label">Gender <span class="star">*</span></span>
+                      <mat-radio-group formControlName="gender" class="choice-row tight">
+                        @for (o of ['Male', 'Female']; track o) { <div class="choice" [class.selected]="ipdForm.getRawValue().newborn.gender === o"><mat-radio-button [value]="o" color="primary">{{ o }}</mat-radio-button></div> }
+                      </mat-radio-group>
+                    </div>
+                    <div class="field">
+                      <label>Birth weight <span class="star">*</span></label>
+                      <mat-form-field><input matInput type="number" step="0.1" formControlName="weight" /><span matTextSuffix class="muted">&nbsp;kg</span><mat-error>Enter a weight between 0.3 and 7 kg</mat-error></mat-form-field>
+                    </div>
+                    <div>
+                      <span class="radio-label">Admitted to nursery / NICU? <span class="star">*</span></span>
+                      <mat-radio-group formControlName="nicu" class="choice-row tight">
+                        @for (o of ['No', 'Yes']; track o) { <div class="choice" [class.selected]="ipdForm.getRawValue().newborn.nicu === o"><mat-radio-button [value]="o" color="primary">{{ o }}</mat-radio-button></div> }
+                      </mat-radio-group>
+                    </div>
+                  </div>
+                </div>
+              }
+            </app-form-section>
+
+            <app-form-section [n]="5" title="Bills & documents" description="Submit within 30 days of the expense. Bills must be on the hospital, physician, pharmacy or lab’s official bill book." [required]="true">
+              <div formGroupName="bills">
+                <div class="grid-2">
+                  <div class="field">
+                    <label>Total amount claimed <span class="star">*</span></label>
+                    <mat-form-field><span matTextPrefix class="prefix-text">PKR</span><input matInput type="number" formControlName="total" /><mat-hint>Per admission limit {{ ent.ipdPerAdmission | pkr: true }}</mat-hint><mat-error>Enter the amount</mat-error></mat-form-field>
+                  </div>
+                </div>
+                <app-file-upload formControlName="hospitalBills" label="Itemized hospital bill & payment receipts" [required]="true"
+                                 note="Original bill with room type and a breakup of room, lab and radiology, consultation, surgeon, operation theatre, anesthesia, medicines and other charges."
+                                 [invalid]="attempted() && ipdForm.controls.bills.controls.hospitalBills.invalid" />
+                <app-file-upload formControlName="discharge" label="Discharge / clinical summary" [required]="true" [multiple]="false"
+                                 [invalid]="attempted() && ipdForm.controls.bills.controls.discharge.invalid" />
+              </div>
+            </app-form-section>
+
+            <app-form-section [n]="6" title="Bank details" description="Approved claims are paid by direct bank transfer." [required]="true">
+              <div class="grid-3" formGroupName="bank">
+                <div class="field"><label>Account title <span class="star">*</span></label><mat-form-field><input matInput formControlName="title" /></mat-form-field></div>
+                <div class="field"><label>Bank <span class="star">*</span></label>
+                  <mat-form-field><mat-select formControlName="bank" placeholder="Select bank">@for (b of banks; track b) { <mat-option [value]="b">{{ b }}</mat-option> }</mat-select><mat-error>Choose the bank</mat-error></mat-form-field></div>
+                <div class="field"><label>IBAN <span class="star">*</span></label>
+                  <mat-form-field><input matInput formControlName="iban" placeholder="PK36SCBL0000001123456702" maxlength="24" /><mat-error>24 characters starting with PK</mat-error></mat-form-field></div>
+              </div>
+            </app-form-section>
+
+            <app-form-section [n]="7" title="Declaration / authorization" description="Please read before you submit." [required]="true">
+              <div class="rules">I hereby certify that all answers, and all documents submitted with the claim form, are complete and true. I authorize any doctor, hospital, clinic or medical provider, insurance company or any other person who has any record about me and/or my family members to provide EFU Health Insurance Limited with the information, including copies of their records, about any sickness or accident, treatment, examination, advice or hospitalization.</div>
+              <mat-checkbox formControlName="declaration" color="primary">I have read and agree to the declaration above. This is my signature on the claim.</mat-checkbox>
+            </app-form-section>
+
+            <div class="physician" [class.ready]="ipdComplete()">
+              <span class="pic"><mat-icon>{{ ipdComplete() ? 'lock_open' : 'lock' }}</mat-icon></span>
+              <div class="pbody">
+                <strong>Attending physician form · EFU page 2</strong>
+                <small>{{ ipdComplete()
+                  ? 'All required fields are complete. Preview the physician form now; you’ll download it and upload the signed copy after you submit.'
+                  : 'Available after you complete all required fields. You’ll then download it, get it filled, signed and stamped by the treating doctor, and upload it to this claim.' }}</small>
+                <div class="prog">
+                  <mat-progress-bar mode="determinate" [value]="(requiredProgress().done / requiredProgress().total) * 100" />
+                  <span>{{ requiredProgress().done === requiredProgress().total ? 'All ' + requiredProgress().total : requiredProgress().done + ' of ' + requiredProgress().total }} required fields complete</span>
+                </div>
+              </div>
+              <button mat-stroked-button type="button" [disabled]="!ipdComplete()" (click)="previewPhysicianForm()"><mat-icon>visibility</mat-icon>Preview form</button>
+            </div>
+
+            <app-form-footer [busy]="submitting()" submitLabel="Submit employee form" [disabled]="!ipdComplete()"
+                             [disabledReason]="'Complete ' + (requiredProgress().total - requiredProgress().done) + ' more required field(s) to submit.'"
+                             (cancel)="cancel()" (draft)="saveDraft()" (submit)="submit()" />
+          </form>
+        }
+      }
+    </div>
+
+    <aside class="side">
+      <div class="card">
+        <div class="card-title">Family entitlement · {{ today.getFullYear() }}</div>
+        @if (treatment() !== 'IPD') {
+          <div class="kv"><span>OPD — family pool</span><span>{{ opdLeft | pkr: true }} left</span></div>
+          <mat-progress-bar mode="determinate" [value]="(ent.opdUsed / ent.opdLimit) * 100" />
+          <small class="muted">{{ ent.opdUsed | pkr: true }} of {{ ent.opdLimit | pkr }} used</small>
+        }
+        @if (treatment() !== 'OPD') {
+          <div class="kv"><span>IPD — per admission</span><span>{{ ent.ipdPerAdmission | pkr: true }}</span></div>
+          <div class="kv"><span>Room entitlement</span><span>{{ ent.room }}</span></div>
+        }
+        <div class="divider"></div>
+        <div class="fam-title">Covered family members</div>
+        @for (f of family; track f.name) {
+          <div class="fam"><span class="av">{{ f.initials }}</span><span>{{ f.name }}</span><small>{{ f.relation }}</small></div>
+        }
+        <a class="small">Update dependents with HR →</a>
+      </div>
+      @if (treatment() === 'IPD') {
+        <app-workflow-card [steps]="ipdSteps" firstLabel="Employee form" firstNote="You fill in EFU page 1" />
+      } @else {
+        <app-workflow-card [steps]="opdSteps" />
+      }
+    </aside>
+  </div>
+</div>

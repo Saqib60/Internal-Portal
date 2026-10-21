@@ -1,0 +1,19 @@
+:host { width: 100%; max-width: 440px; }
+.card { padding: 36px 40px 32px; border-radius: 16px; box-shadow: 0 12px 40px rgba(15, 27, 61, .08); }
+h2 { font-size: 26px; font-weight: 700; letter-spacing: -.01em; }
+.sub { color: var(--text-2); margin: 6px 0 24px; font-size: 13.5px; line-height: 1.5; }
+.field { margin-bottom: 4px; }
+.mat-mdc-form-field { width: 100%; }
+.full { width: 100%; height: 44px; margin-top: 8px; }
+.row { display: flex; align-items: center; justify-content: space-between; margin: 4px 0 8px; }
+.banner { display: flex; gap: 10px; align-items: flex-start; border-radius: 10px; padding: 10px 12px; margin-bottom: 18px; font-size: 13px;
+  background: var(--red-50); color: #8f1d1d; border: 1px solid #f5c9c9;
+  mat-icon { font-size: 20px; width: 20px; height: 20px; flex: none; }
+  strong { display: block; } }
+.banner.info { background: var(--blue-50); color: #1b3a8f; border-color: var(--blue-100); }
+.foot { display: flex; align-items: center; justify-content: center; gap: 6px; color: var(--muted); font-size: 12.5px; margin-top: 18px;
+  mat-icon { font-size: 16px; width: 16px; height: 16px; } }
+.captcha-row { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: start; }
+.steps { font-size: 12px; font-weight: 600; color: var(--blue); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 10px; }
+.back { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; margin-top: 18px; mat-icon { font-size: 18px; width: 18px; height: 18px; } }
+.demo { margin-top: 14px; text-align: center; font-size: 11.5px; color: var(--muted); code { background: #eef0f4; padding: 1px 6px; border-radius: 4px; } }

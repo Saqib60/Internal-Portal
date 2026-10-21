@@ -1,0 +1,95 @@
+<mat-sidenav-container class="container" autosize>
+  <mat-sidenav mode="side" opened class="nav" [class.collapsed]="layout.navCollapsed()" [disableClose]="true">
+    <div class="brand">
+      <span class="logo">ESS</span>
+      @if (!layout.navCollapsed()) { <div><strong>ESS Portal</strong><small>Employee Self-Service</small></div> }
+    </div>
+    <nav>
+      @if (!layout.navCollapsed()) { <div class="group">Main</div> } @else { <div class="sep"></div> }
+      <a routerLink="/dashboard" routerLinkActive="active" [matTooltip]="layout.navCollapsed() ? 'Dashboard' : ''" matTooltipPosition="right"><mat-icon fontSet="material-icons-outlined">grid_view</mat-icon><span>Dashboard</span></a>
+      <a routerLink="/requests" routerLinkActive="active" [matTooltip]="layout.navCollapsed() ? 'My Requests' : ''" matTooltipPosition="right"><mat-icon fontSet="material-icons-outlined">receipt_long</mat-icon><span>My Requests</span></a>
+      <a routerLink="/approvals" routerLinkActive="active" [matTooltip]="layout.navCollapsed() ? 'Approvals' : ''" matTooltipPosition="right">
+        <mat-icon>done</mat-icon><span>Approvals</span>
+        @if (approvalsCount() && !layout.navCollapsed()) { <em class="count">{{ approvalsCount() }}</em> }
+      </a>
+      @for (g of groups; track g.name) {
+        @if (!layout.navCollapsed()) { <div class="group">{{ g.name }}</div> } @else { <div class="sep"></div> }
+        @for (m of g.items; track m.key) {
+          <a [routerLink]="m.route" routerLinkActive="active" [matTooltip]="layout.navCollapsed() ? m.label : ''" matTooltipPosition="right">
+            <mat-icon fontSet="material-icons-outlined">{{ m.icon }}</mat-icon><span>{{ m.label }}</span>
+          </a>
+        }
+      }
+    </nav>
+    <div class="bottom">
+      <button class="collapse" (click)="layout.toggleNav()" [matTooltip]="layout.navCollapsed() ? 'Expand menu' : ''" matTooltipPosition="right">
+        <mat-icon>{{ layout.navCollapsed() ? 'chevron_right' : 'chevron_left' }}</mat-icon><span>Collapse menu</span>
+      </button>
+      <div class="me">
+        <span class="avatar">{{ auth.user()?.initials }}</span>
+        @if (!layout.navCollapsed()) {
+          <div class="who"><strong>{{ auth.user()?.name }}</strong><small>{{ auth.user()?.code }}</small></div>
+        }
+        <button mat-icon-button (click)="signOut()" matTooltip="Sign out" aria-label="Sign out"><mat-icon>logout</mat-icon></button>
+      </div>
+    </div>
+  </mat-sidenav>
+
+  <mat-sidenav-content class="content">
+    <header class="topbar">
+      <div class="search">
+        <mat-icon>search</mat-icon>
+        <input [formControl]="search" [matAutocomplete]="auto" placeholder="Search forms, requests or policies…" aria-label="Search" />
+        <mat-autocomplete #auto="matAutocomplete" (optionSelected)="go($event.option.value)" [displayWith]="blank">
+          @for (h of hits(); track h.link) {
+            <mat-option [value]="h" class="hit">
+              <mat-icon fontSet="material-icons-outlined">{{ h.icon }}</mat-icon>
+              <span class="hl">{{ h.label }}</span><small>{{ h.sub }}</small>
+            </mat-option>
+          }
+        </mat-autocomplete>
+      </div>
+      <span class="spacer"></span>
+      <button class="round" [matMenuTriggerFor]="notifMenu" #nt="matMenuTrigger" aria-label="Notifications">
+        <mat-icon fontSet="material-icons-outlined">notifications</mat-icon>
+        @if (notifications.unreadCount()) { <em class="badge">{{ notifications.unreadCount() }}</em> }
+      </button>
+      <button class="round" [matMenuTriggerFor]="helpMenu" aria-label="Help"><mat-icon fontSet="material-icons-outlined">help_outline</mat-icon></button>
+      <div class="user">
+        <span class="avatar">{{ auth.user()?.initials }}</span>
+        <div><strong>{{ auth.user()?.name }}</strong><small>{{ auth.user()?.designation }} · {{ auth.user()?.location }}</small></div>
+      </div>
+    </header>
+    <main><router-outlet /></main>
+  </mat-sidenav-content>
+</mat-sidenav-container>
+
+<mat-menu #notifMenu="matMenu" class="notif-menu" xPosition="before">
+  <div class="np" (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()">
+    <div class="np-head">
+      <strong>Notifications</strong>
+      <button mat-button color="primary" [disabled]="!notifications.unreadCount()" (click)="notifications.markAllRead()">Mark all as read</button>
+    </div>
+    <mat-button-toggle-group class="tabs" [value]="notifTab()" (change)="notifTab.set($event.value)" hideSingleSelectionIndicator>
+      <mat-button-toggle value="all">All</mat-button-toggle>
+      <mat-button-toggle value="unread">Unread @if (notifications.unreadCount()) {({{ notifications.unreadCount() }})}</mat-button-toggle>
+    </mat-button-toggle-group>
+    <div class="np-list">
+      @for (n of notifList(); track n.id) {
+        <app-notification-item [n]="n" (click)="openNotification(n); nt.closeMenu()" />
+      } @empty {
+        <div class="empty">
+          <mat-icon fontSet="material-icons-outlined">{{ notifTab() === 'unread' && notifications.all().length ? 'mark_email_read' : 'notifications_none' }}</mat-icon>
+          <strong>{{ notifTab() === 'unread' && notifications.all().length ? 'You’re all caught up' : 'No notifications yet' }}</strong>
+          <span>{{ notifTab() === 'unread' && notifications.all().length ? 'New updates on your requests will show up here.' : 'When something happens with your requests, you’ll see it here.' }}</span>
+        </div>
+      }
+    </div>
+  </div>
+  <a mat-menu-item routerLink="/notifications" class="np-foot">View all notifications</a>
+</mat-menu>
+
+<mat-menu #helpMenu="matMenu" xPosition="before">
+  <button mat-menu-item (click)="helpdesk()"><mat-icon>support_agent</mat-icon>Contact HR helpdesk</button>
+  <button mat-menu-item (click)="helpdesk()"><mat-icon>policy</mat-icon>View policies</button>
+</mat-menu>
